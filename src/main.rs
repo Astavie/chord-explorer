@@ -4,6 +4,7 @@ use std::slice::from_raw_parts_mut;
 use error_iter::ErrorIter;
 use log::error;
 use pixels::{Error, Pixels, SurfaceTexture};
+use widget::{Canvas, CutDir, Rect};
 use winit::dpi::LogicalSize;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::EventLoop;
@@ -14,6 +15,7 @@ use winit_input_helper::WinitInputHelper;
 use crate::font::{CharData, Font};
 
 mod font;
+mod widget;
 
 const WIDTH: usize = 320;
 const HEIGHT: usize = 240;
@@ -34,14 +36,14 @@ type Color = [u8; 4];
 
 struct PixBuf<'a> {
     buf: &'a mut [Color],
-    width: u32,
-    height: u32,
+    width: i32,
+    height: i32,
 }
 
-impl PixBuf<'_> {
+impl<'a> PixBuf<'a> {
     fn set_pixel(&mut self, x: i32, y: i32, color: Color) {
-        if x >= 0 && y >= 0 && (x as u32) < self.width && (y as u32) < self.height {
-            self.buf[(x as u32 + y as u32 * self.width) as usize] = color;
+        if x >= 0 && y >= 0 && x < self.width && y < self.height {
+            self.buf[(x + y * self.width) as usize] = color;
         }
     }
     fn set_scaled_pixel(&mut self, x: i32, y: i32, scale: i32, color: Color) {
@@ -78,7 +80,7 @@ fn main() -> Result<(), Error> {
         Pixels::new(WIDTH as u32, HEIGHT as u32, surface_texture)?
     };
 
-    let mut font = Font::parse_bdf(Cursor::new(COZETTE), 6).unwrap();
+    let mut font = Font::parse_bdf(Cursor::new(COZETTE), 6, 13).unwrap();
 
     // double sharp
     font.chars.insert(
@@ -158,8 +160,8 @@ fn main() -> Result<(), Error> {
         },
     );
 
-    let mut width = WIDTH as u32;
-    let mut height = HEIGHT as u32;
+    let mut width = WIDTH as i32;
+    let mut height = HEIGHT as i32;
 
     event_loop
         .run(move |event, target| {
@@ -169,39 +171,31 @@ fn main() -> Result<(), Error> {
                 event: WindowEvent::RedrawRequested,
             } = event
             {
-                pixels.frame_mut().fill(0);
-                font.draw(
-                    &mut PixBuf {
+                let mut canvas = Canvas {
+                    pix: PixBuf {
                         buf: as_chunks_mut(pixels.frame_mut()).0,
                         width,
                         height,
                     },
-                    "C  C♯  C♭  C♮  C𝄪  C𝄫  C𝄲  C𝄳  C𝄲♯  C𝄳♭",
-                    (80, 100),
-                    [255, 255, 255, 255],
-                    2,
-                );
-                font.draw(
-                    &mut PixBuf {
-                        buf: as_chunks_mut(pixels.frame_mut()).0,
+                    font: &font,
+                    rect: Rect {
+                        x: 0,
+                        y: 0,
                         width,
                         height,
+                        dir: CutDir::Vertical,
                     },
-                    "C7 C♯7 C♭7 C♮7 C𝄪7 C𝄫7 C𝄲7 C𝄳7 C𝄲♯7 C𝄳♭7",
-                    (80, 130),
-                    [255, 255, 255, 255],
-                    2,
-                );
-                font.draw(
-                    &mut PixBuf {
-                        buf: as_chunks_mut(pixels.frame_mut()).0,
-                        width,
-                        height,
+                };
+
+                canvas.clear();
+                canvas.center(
+                    38 * canvas.font.width * 2,
+                    canvas.font.height * 2 * 3,
+                    |canvas| {
+                        canvas.text("C  C♯  C♭  C♮  C𝄪  C𝄫  C𝄲  C𝄳  C𝄲♯  C𝄳♭ ");
+                        canvas.text("C7 C♯7 C♭7 C♮7 C𝄪7 C𝄫7 C𝄲7 C𝄳7 C𝄲♯7 C𝄳♭7");
+                        canvas.text("Cm C♯m C♭m C♮m C𝄪m C𝄫m C𝄲m C𝄳m C𝄲♯m C𝄳♭m");
                     },
-                    "Cm C♯m C♭m C♮m C𝄪m C𝄫m C𝄲m C𝄳m C𝄲♯m C𝄳♭m",
-                    (80, 160),
-                    [255, 255, 255, 255],
-                    2,
                 );
 
                 if let Err(err) = pixels.render() {
@@ -221,8 +215,8 @@ fn main() -> Result<(), Error> {
 
                 // Resize the window
                 if let Some(size) = input.window_resized() {
-                    width = size.width;
-                    height = size.height;
+                    width = size.width as i32;
+                    height = size.height as i32;
                     if let Err(err) = pixels.resize_surface(size.width, size.height) {
                         log_error("pixels.resize_surface", err);
                         target.exit();

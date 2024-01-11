@@ -26,15 +26,16 @@ fn chunks(s: &str, n: usize) -> impl Iterator<Item = &str> {
 
 #[derive(Debug)]
 pub struct Font {
-    pub width: u32,
+    pub width: i32,
+    pub height: i32,
     pub chars: HashMap<char, CharData>,
     pub ligatures: HashMap<(char, char), CharData>,
 }
 
 #[derive(Debug)]
 pub struct CharData {
-    pub width: u32,
-    pub height: u32,
+    pub width: i32,
+    pub height: i32,
     pub xo: i32,
     pub yo: i32,
     pub data: Vec<u8>,
@@ -44,11 +45,9 @@ impl CharData {
     fn draw(&self, buf: &mut PixBuf, pos: (i32, i32), color: Color, scale: i32) {
         let mut data = self.data.as_slice();
 
-        let iheight = self.height as i32;
-
         let data_width = (self.width as usize + 7) >> 3;
 
-        for y in 0..iheight {
+        for y in 0..self.height {
             let line = &data[0..data_width];
             data = &data[data_width..];
 
@@ -60,7 +59,7 @@ impl CharData {
                     if pixel {
                         buf.set_scaled_pixel(
                             pos.0 / scale + x + self.xo,
-                            pos.1 / scale + y - iheight - self.yo,
+                            pos.1 / scale + y - self.height - self.yo,
                             scale,
                             color,
                         );
@@ -72,13 +71,14 @@ impl CharData {
 }
 
 impl Font {
-    pub fn parse_bdf(bdf: impl BufRead, width: u32) -> Option<Self> {
+    pub fn parse_bdf(bdf: impl BufRead, width: i32, height: i32) -> Option<Self> {
         let mut lines = bdf.lines().filter_map(|line| line.ok());
 
         let mut font = Self {
             chars: HashMap::new(),
             ligatures: HashMap::new(),
             width,
+            height,
         };
 
         loop {
@@ -104,8 +104,8 @@ impl Font {
                 }
             };
             let mut bbx = bbx.split_whitespace().skip(1);
-            let width = u32::from_str_radix(bbx.next()?, 10).ok()?;
-            let height = u32::from_str_radix(bbx.next()?, 10).ok()?;
+            let width = i32::from_str_radix(bbx.next()?, 10).ok()?;
+            let height = i32::from_str_radix(bbx.next()?, 10).ok()?;
             let xo = i32::from_str_radix(bbx.next()?, 10).ok()?;
             let yo = i32::from_str_radix(bbx.next()?, 10).ok()?;
 
@@ -140,7 +140,15 @@ impl Font {
         }
     }
 
-    pub fn draw(&self, buf: &mut PixBuf, s: &str, mut pos: (i32, i32), color: Color, scale: i32) {
+    pub fn draw(
+        &self,
+        buf: &mut PixBuf,
+        s: &str,
+        mut pos: (i32, i32),
+        color: Color,
+        scale: i32,
+    ) -> i32 {
+        let mut len = 0;
         let mut chars = s.chars().peekable();
         loop {
             let Some(n) = chars.next() else {
@@ -157,7 +165,9 @@ impl Font {
             {
                 char.draw(buf, pos, color, scale);
             }
-            pos.0 += self.width as i32 * scale;
+            pos.0 += self.width * scale;
+            len += 1;
         }
+        len
     }
 }
