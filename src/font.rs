@@ -140,6 +140,26 @@ impl Font {
         }
     }
 
+    pub fn len(&self, s: &str) -> i32 {
+        let mut len = 0;
+        let mut chars = s.chars().peekable();
+        loop {
+            let Some(n) = chars.next() else {
+                break;
+            };
+            if chars
+                .peek()
+                .copied()
+                .and_then(|snd| self.ligatures.get(&(n, snd)))
+                .is_some()
+            {
+                chars.next();
+            }
+            len += 1;
+        }
+        len
+    }
+
     pub fn draw(
         &self,
         buf: &mut PixBuf,

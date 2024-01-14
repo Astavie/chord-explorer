@@ -87,10 +87,23 @@ pub trait Tab: Clone + Copy + PartialEq + Eq {
     fn name(&self) -> &str;
 
     fn draw(&self, canvas: &mut Canvas) {
-        let size = self.name().len() as i32;
-        canvas.center(size * canvas.font_width(), canvas.font_height(), |canvas| {
-            canvas.text(self.name());
-        })
+        let len = canvas.visuals.font.len(self.name());
+        canvas.center(
+            len * canvas.visuals.font_width(),
+            canvas.visuals.font_height() + canvas.visuals.text_size * 4,
+            |canvas| {
+                canvas.text(self.name());
+            },
+        )
+    }
+}
+
+impl Visuals<'_> {
+    pub fn font_height(&self) -> i32 {
+        self.font.height * self.text_size
+    }
+    pub fn font_width(&self) -> i32 {
+        self.font.width * self.text_size
     }
 }
 
@@ -108,12 +121,6 @@ impl Canvas<'_> {
     }
     pub fn mouse_right(&self) -> bool {
         self.hover() && self.events.mouse_right
-    }
-    pub fn font_height(&self) -> i32 {
-        self.visuals.font.height * self.visuals.text_size
-    }
-    pub fn font_width(&self) -> i32 {
-        self.visuals.font.width * self.visuals.text_size
     }
 
     pub fn with_rect(&mut self, rect: Rect, f: impl FnOnce(&mut Self)) {
@@ -219,7 +226,7 @@ impl Widget for Text<'_> {
             self.text,
             (
                 canvas.rect.x,
-                canvas.rect.y + (canvas.visuals.font.height - 2) * self.scale,
+                canvas.rect.y + canvas.visuals.font.height * self.scale,
             ),
             self.color,
             self.scale,

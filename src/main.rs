@@ -11,11 +11,10 @@ use winit::dpi::LogicalSize;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::EventLoop;
 use winit::keyboard::KeyCode;
-use winit::window::WindowBuilder;
+use winit::window::{WindowBuilder, WindowLevel};
 use winit_input_helper::WinitInputHelper;
 
 use crate::font::{CharData, Font};
-use crate::widget::Tab;
 
 mod explorer;
 mod font;
