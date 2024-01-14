@@ -1,10 +1,12 @@
 use std::io::Cursor;
 use std::slice::from_raw_parts_mut;
+use std::vec;
 
 use error_iter::ErrorIter;
+use explorer::Main;
 use log::error;
 use pixels::{Error, Pixels, SurfaceTexture};
-use widget::{Canvas, CutDir, Rect};
+use widget::{Canvas, CutDir, Events, Rect, Visuals, Widget};
 use winit::dpi::LogicalSize;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::EventLoop;
@@ -13,7 +15,9 @@ use winit::window::WindowBuilder;
 use winit_input_helper::WinitInputHelper;
 
 use crate::font::{CharData, Font};
+use crate::widget::Tab;
 
+mod explorer;
 mod font;
 mod widget;
 
@@ -33,6 +37,10 @@ pub fn as_chunks_mut<T, const N: usize>(s: &mut [T]) -> (&mut [[T; N]], &mut [T]
 }
 
 type Color = [u8; 4];
+
+fn invert(c: Color) -> Color {
+    [255 - c[0], 255 - c[1], 255 - c[2], 255 - c[3]]
+}
 
 struct PixBuf<'a> {
     buf: &'a mut [Color],
@@ -163,6 +171,8 @@ fn main() -> Result<(), Error> {
     let mut width = WIDTH as i32;
     let mut height = HEIGHT as i32;
 
+    let mut explorer = Main::default();
+
     event_loop
         .run(move |event, target| {
             // Draw current frame
@@ -177,26 +187,27 @@ fn main() -> Result<(), Error> {
                         width,
                         height,
                     },
-                    font: &font,
                     rect: Rect {
                         x: 0,
                         y: 0,
                         width,
                         height,
+                    },
+                    visuals: Visuals {
+                        font: &font,
+                        text_size: 2,
                         dir: CutDir::Vertical,
+                        color: [255, 255, 255, 255],
+                    },
+                    events: Events {
+                        mouse_left: input.mouse_held(0),
+                        mouse_middle: input.mouse_held(2),
+                        mouse_right: input.mouse_held(1),
+                        cursor: input.cursor().map(|(x, y)| (x as i32, y as i32)),
                     },
                 };
-
                 canvas.clear();
-                canvas.center(
-                    38 * canvas.font.width * 2,
-                    canvas.font.height * 2 * 3,
-                    |canvas| {
-                        canvas.text("C  C♯  C♭  C♮  C𝄪  C𝄫  C𝄲  C𝄳  C𝄲♯  C𝄳♭ ");
-                        canvas.text("C7 C♯7 C♭7 C♮7 C𝄪7 C𝄫7 C𝄲7 C𝄳7 C𝄲♯7 C𝄳♭7");
-                        canvas.text("Cm C♯m C♭m C♮m C𝄪m C𝄫m C𝄲m C𝄳m C𝄲♯m C𝄳♭m");
-                    },
-                );
+                explorer.draw(&mut canvas);
 
                 if let Err(err) = pixels.render() {
                     log_error("pixels.render", err);
